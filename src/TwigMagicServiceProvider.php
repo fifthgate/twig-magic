@@ -19,7 +19,7 @@ class TwigMagicServiceProvider extends ServiceProvider {
     {
     	Twig::addFunction(
             new TwigFunction(
-                'svg',
+                'renderSvg',
                 function ($path) {
                     $cachedValue = Cache::get("inline-images-".$path);
                     if ($cachedValue) {
@@ -51,7 +51,7 @@ class TwigMagicServiceProvider extends ServiceProvider {
         );
         Twig::addFunction(
             new TwigFunction(
-                'preload',
+                'preloadAsset',
                 function ($path) {
                     if (file_exists(public_path($path))) {
                         $mimeType = File::mimeType(public_path($path));
