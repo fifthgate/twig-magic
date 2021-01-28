@@ -1,0 +1,13 @@
+{
+    "name": "fifthgate/twig-magic",
+    "description": "A set of magical twig functions that make it easier to inline assets.",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Sam Baynham",
+            "email": "sam.baynham@gmail.com"
+        }
+    ],
+    "require": {}
+}
