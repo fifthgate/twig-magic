@@ -6,8 +6,22 @@
     "authors": [
         {
             "name": "Sam Baynham",
-            "email": "sam.baynham@gmail.com"
+            "email": "sam@fifthgate.net"
         }
     ],
-    "require": {}
+    "autoload": {
+        "psr-4": {
+            "Fifthgate\\TwigMagic\\": "src/"
+        }
+    },
+    "require": {
+        "dinhquochan/laravel-twig": "^1.3"
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Fifthgate\\TwigMagic\\TwigMagicServiceProvider"
+            ]
+        }
+    }
 }
