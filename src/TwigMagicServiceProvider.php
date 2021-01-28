@@ -23,7 +23,7 @@ class TwigMagicServiceProvider extends ServiceProvider {
                 'renderSvg',
                 function ($path) {
                     $cachedValue = Cache::get("inline-images-".$path);
-                    if ($cachedValue) {
+                    if ($cachedValue && config('app.env') != 'development') {
                         return $cachedValue;
                     }
                     $publicPath = public_path($path);
@@ -55,7 +55,7 @@ class TwigMagicServiceProvider extends ServiceProvider {
                 'inlineCss',
                 function ($path) {
                     $cachedValue = Cache::get("inline-css-".$path);
-                    if ($cachedValue) {
+                    if ($cachedValue && config('app.env') != 'development') {
                         return $cachedValue;
                     }
                     $publicPath = public_path($path);
@@ -100,8 +100,8 @@ class TwigMagicServiceProvider extends ServiceProvider {
                 function ($path, $extension = '*') {
                     $cacheKey = 'compiled-directory-preloads-'.str_replace("/", "_", $path).'-'.$extension;
                     $cachedValue = Cache::get($cacheKey);
-                    if ($cachedValue) {
-                        //return $cachedValue;
+                    if ($cachedValue && config('app.env') != 'development') {
+                        return $cachedValue;
                     }
                     if (file_exists(public_path($path))) {
                         $publicPath = public_path($path);
