@@ -10,14 +10,15 @@ use Illuminate\Support\Facades\Cache;
 use \DirectoryIterator;
 
 class TwigMagicServiceProvider extends ServiceProvider {
-	/**
+
+    /**
     * Publishes configuration file.
     *
     * @return  void
     */
     public function boot()
     {
-    	Twig::addFunction(
+        Twig::addFunction(
             new TwigFunction(
                 'renderSvg',
                 function ($path) {
@@ -47,6 +48,34 @@ class TwigMagicServiceProvider extends ServiceProvider {
                         'html'
                     ]
                 ]
+            )
+        );
+        Twig::addFunction(
+            new TwigFunction(
+                'inlineCss',
+                function ($path) {
+                    $cachedValue = Cache::get("inline-css-".$path);
+                    if ($cachedValue) {
+                        return $cachedValue;
+                    }
+                    $publicPath = public_path($path);
+                    if (file_exists($publicPath)) {
+                        $mimeType = File::mimeType($publicPath);
+                        $extension = File::extension($publicPath);
+                        if ($mimeType == 'text/x-asm' && $extension == 'css') {
+                            $payload = '<style>'.File::get($publicPath).'</style>';
+                            Cache::set("inline-css-".$path, $payload);
+                            return $payload;
+                        }
+                        return;
+                    }
+                },
+                [
+                    'is_safe' => [
+                        'html'
+                    ]
+                ]
+
             )
         );
         Twig::addFunction(
