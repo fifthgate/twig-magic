@@ -8,9 +8,213 @@ use Twig\TwigFunction;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Cache;
 use \DirectoryIterator;
+use \Exception;
 
 class TwigMagicServiceProvider extends ServiceProvider {
 
+
+    private function pathToCacheKey(string $assetType, string $path) : string {
+        $sanitizedPath = str_replace("/", "_", $path);
+        $sanitizedPath = str_replace(".", "_", $sanitizedPath);
+        $cacheKey = "inline-{$assetType}-{$sanitizedPath}";
+        return $cacheKey;
+    }
+
+    private function preloadDir() {
+        return new TwigFunction(
+            'preloadDir',
+            function ($path, $extension = '*') {
+                $cacheKey = 'compiled-directory-preloads-'.str_replace("/", "_", $path).'-'.$extension;
+                $cachedValue = Cache::get($cacheKey);
+
+                $testMode = config('twig-magic.test-mode');
+                if ($cachedValue && !$testMode) {
+                    return $cachedValue;
+                }
+                if (file_exists(public_path($path))) {
+                    $publicPath = public_path($path);
+                    $returnString = '';
+                    $dir = new DirectoryIterator($publicPath);
+                    foreach ($dir as $fileInfo) {
+                        if($fileInfo->isDot()) { continue; }
+                        if ( $extension!= '*' && $fileInfo->getExtension() != $extension) {
+                            continue;
+                        }
+                        $mimeType = File::mimeType($fileInfo->getPathName());
+   
+                        $returnString.="<link rel='preload' href='{$path}/{$fileInfo->getFileName()}' type='{$mimeType}' crossorigin>";
+                        $returnString.="\n";
+                    }
+                    Cache::set($cacheKey, $returnString);
+                    return $returnString;
+                } 
+                
+            },
+            [
+                'is_safe' => [
+                    'html'
+                ]
+            ]
+        );
+    }
+    private function renderSVG() {
+        return new TwigFunction(
+            'renderSvg',
+            function (string $path, bool $forceInlining = false) {
+                $cacheKey = $this->pathToCacheKey('image', $path);
+                $cachedValue = Cache::get($cacheKey);
+                $testMode = config('twig-magic.test-mode');
+
+                if ($cachedValue && !$testMode) {
+                    return $cachedValue;
+                }
+
+                $publicPath = public_path($path);
+                if (file_exists($publicPath)) {
+                    $mimeType = File::mimeType($publicPath);
+                    if ($mimeType = 'image/svg') {
+                        $cutOffSize = config('twig-magic.svg_inline_cutoff');
+                        if (File::size($publicPath) <= $cutOffSize or $forceInlining) {
+                            $payload = File::get($publicPath);
+                            Cache::set($cacheKey, $payload);
+                            return $payload;        
+                        } else {
+                            return "<img src='{$path}'></img>";
+                        }
+                    }
+                }
+                return;
+            },
+            [
+                'is_safe' => [
+                    'html'
+                ]
+            ]
+        );
+    }
+
+    private function inlineCSS() {
+        return new TwigFunction(
+            'inlineCss',
+            function (string $path, bool $forceInlining = false, string $media = 'screen') {
+
+                $cacheKey = $this->pathToCacheKey('css', $path);
+
+                $cachedValue = Cache::get($cacheKey);
+                $testMode = config('twig-magic.test-mode');
+                if ($cachedValue && ! $testMode) {
+                    return $cachedValue;
+                }
+                $absolutePath = public_path($path);
+                if (file_exists($absolutePath)) {
+
+                    $extension = File::extension($absolutePath);
+                    if ($extension == 'css') {
+                        $cutOffSize = config('twig-magic.css_inline_cutoff');
+                        if (File::size($absolutePath) <= $cutOffSize or $forceInlining) {
+                            $payload = '<style>'.File::get($absolutePath).'</style>';
+                        } else {
+
+                            $payload = "<link rel='stylesheet' media='{$media}' href='/{$path}'>";
+                        }
+                        Cache::set($cacheKey, $payload);
+                        return $payload;
+                    }
+                } else {
+                    throw new Exception("{$path} not found");
+                }
+                return;
+            },
+            [
+                'is_safe' => [
+                    'html'
+                ]
+            ]
+        );
+    }
+
+    private function inlineJS() {
+        return new TwigFunction(
+            'inlineJs',
+            function (string $path,
+                bool $forceInlining = false,
+                string $media = 'screen',
+                bool $async = true,
+                bool $defer = true
+            ) {
+                $cacheKey = $this->pathToCacheKey('js', $path);
+                $cachedValue = Cache::get($cacheKey);
+                $testMode = config('twig-magic.test-mode');
+                if ($cachedValue && !$testMode) {
+                    return $cachedValue;
+                }
+                $publicPath = public_path($path);
+
+                if (file_exists($publicPath)) {
+
+                    $extension = File::extension($publicPath);
+                    
+                    if ($extension == 'js') {
+                        $cutOffSize = config('twig-magic.js_inline_cutoff');
+                        if (File::size($publicPath) <= $cutOffSize or $forceInlining) {
+                            $fileContent = File::get($publicPath);
+
+                            $payload = "<script";
+                            if ($async) {
+                                $payload.=' async';
+                            }
+                            if ($defer) {
+                                $payload.=' defer';
+                            }
+                            $payload.='>';
+                            
+                            $payload.=$fileContent;
+                            $payload.='</script>';
+                            
+                        } else {
+                            $payload = "<script";
+                            if ($async) {
+                                $payload.=' async';
+                            }
+                            if ($defer) {
+                                $payload.=' defer';
+                            }
+                            $payload.=" src='{$publicPath}'";
+                            $payload.='>';
+                            
+                            
+                            $payload.='</script>';
+                        }
+                        Cache::set($cacheKey, $payload);
+                        return $payload;
+                    }
+                }
+                return;
+            },
+            [
+                'is_safe' => [
+                    'html'
+                ]
+            ]
+        );
+    }
+
+    private function preloadAsset() {
+        return new TwigFunction(
+            'preloadAsset',
+            function ($path) {
+                if (file_exists(public_path($path))) {
+                    $mimeType = File::mimeType(public_path($path));
+                    return "<link rel='preload' href='{$path}' type='{$mimeType}' crossorigin>";
+                }
+            },
+            [
+                'is_safe' => [
+                    'html'
+                ]
+            ]
+        );
+    }
     /**
     * Publishes configuration file.
     *
@@ -18,6 +222,8 @@ class TwigMagicServiceProvider extends ServiceProvider {
     */
     public function boot()
     {
+
+        $this->testMode = config('twig-magic.test-mode');
         $this->publishes(
             [
                 __DIR__.'/../config/twig-magic.php' => config_path('twig-magic.php'),
@@ -40,119 +246,19 @@ class TwigMagicServiceProvider extends ServiceProvider {
     */
     public function register()
     {
-          $this->mergeConfigFrom(
-            __DIR__.'/../config/twig-magic.php.php',
+        $this->mergeConfigFrom(
+            __DIR__.'/../config/twig-magic.php',
             'twig-magic.php/'
         );
     }
 
     private function getFunctions() {
         return [
-            'renderSVG' => new TwigFunction(
-                'renderSvg',
-                function (string $path, bool $forceInlining = false) {
-                    $cachedValue = Cache::get("inline-images-".$path);
-                    if ($cachedValue) {
-                        return $cachedValue;
-                    }
-                    $publicPath = public_path($path);
-                    if (file_exists($publicPath)) {
-                        $mimeType = File::mimeType($publicPath);
-                        if ($mimeType = 'image/svg') {
-                            $cutOffSize = config('twig-magic.svg_inline_cutoff');
-                            if (File::size($publicPath) <= $cutOffSize) {
-                                $payload = File::get($publicPath);
-                                Cache::set("inline-images-".$path, $payload);
-                                return $payload;        
-                            } else {
-                                return "<img src='{$path}'></img>";
-                            }
-                        }
-                    } else {
-                        return '';
-                    }
-                },
-                [
-                    'is_safe' => [
-                        'html'
-                    ]
-                ]
-            ),
-            'inlineCss' => new TwigFunction(
-                'inlineCss',
-                function (string $path, bool $forceInlining = false) {
-                    $cachedValue = Cache::get("inline-css-".$path);
-                    if ($cachedValue) {
-                        return $cachedValue;
-                    }
-                    $publicPath = public_path($path);
-
-                    if (file_exists($publicPath)) {
-
-                        $extension = File::extension($publicPath);
-                        
-                        if ($extension == 'css') {
-
-                            $payload = '<style>'.File::get($publicPath).'</style>';
-                            Cache::set("inline-css-".$path, $payload);
-                            return $payload;
-                        }
-                        
-                    }
-                },
-                [
-                    'is_safe' => [
-                        'html'
-                    ]
-                ]
-            ),
-            'preloadAsset' => new TwigFunction(
-                'preloadAsset',
-                function ($path) {
-                    if (file_exists(public_path($path))) {
-                        $mimeType = File::mimeType(public_path($path));
-                        return "<link rel='preload' href='{$path}' type='{$mimeType}' crossorigin>";
-                    }
-                },
-                [
-                    'is_safe' => [
-                        'html'
-                    ]
-                ]
-            ),
-            'preloadDir' => new TwigFunction(
-                'preloadDir',
-                function ($path, $extension = '*') {
-                    $cacheKey = 'compiled-directory-preloads-'.str_replace("/", "_", $path).'-'.$extension;
-                    $cachedValue = Cache::get($cacheKey);
-                    if ($cachedValue) {
-                        return $cachedValue;
-                    }
-                    if (file_exists(public_path($path))) {
-                        $publicPath = public_path($path);
-                        $returnString = '';
-                        $dir = new DirectoryIterator($publicPath);
-                        foreach ($dir as $fileInfo) {
-                            if($fileInfo->isDot()) { continue; }
-                            if ( $extension!= '*' && $fileInfo->getExtension() != $extension) {
-                                continue;
-                            }
-                            $mimeType = File::mimeType($fileInfo->getPathName());
-       
-                            $returnString.="<link rel='preload' href='{$path}/{$fileInfo->getFileName()}' type='{$mimeType}' crossorigin>";
-                            $returnString.="\n";
-                        }
-                        Cache::set($cacheKey, $returnString);
-                        return $returnString;
-                    } 
-                    
-                },
-                [
-                    'is_safe' => [
-                        'html'
-                    ]
-                ]
-            )
+            'renderSVG' => $this->renderSVG(),
+            'inlineCss' => $this->inlineCSS(),
+            'preloadAsset' => $this->preloadAsset(),
+            'preloadDir' => $this->preloadDir(),
+            'inlineJS' => $this->inlineJS(),
         ];
     }
 }
