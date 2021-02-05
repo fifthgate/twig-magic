@@ -80,6 +80,34 @@ class TwigMagicServiceProvider extends ServiceProvider {
         );
         Twig::addFunction(
             new TwigFunction(
+                'inlineJs',
+                function ($path) {
+                    $cachedValue = Cache::get("inline-js-".$path);
+                    if ($cachedValue && config('app.env') != 'development') {
+                        return $cachedValue;
+                    }
+                    $publicPath = public_path($path);
+                    if (file_exists($publicPath)) {
+                        $mimeType = File::mimeType($publicPath);
+                        $extension = File::extension($publicPath);
+                        if ($mimeType == 'text/x-asm' && $extension == 'css') {
+                            $payload = '<script>'.File::get($publicPath).'</script>';
+                            Cache::set("inline-js-".$path, $payload);
+                            return $payload;
+                        }
+                        return;
+                    }
+                },
+                [
+                    'is_safe' => [
+                        'html'
+                    ]
+                ]
+
+            )
+        );
+        Twig::addFunction(
+            new TwigFunction(
                 'preloadAsset',
                 function ($path) {
                     if (file_exists(public_path($path))) {
