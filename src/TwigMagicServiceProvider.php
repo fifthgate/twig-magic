@@ -18,19 +18,48 @@ class TwigMagicServiceProvider extends ServiceProvider {
     */
     public function boot()
     {
+        $this->publishes(
+            [
+                __DIR__.'/../config/twig-magic.php' => config_path('twig-magic.php'),
+            ],
+            'twig-magic'
+        );
+
+        foreach ($this->getFunctions() as $functionName => $function)
         Twig::addFunction(
-            new TwigFunction(
+            $function
+        );
+        
+
+    }
+
+    /**
+    * Make config publishment optional by merging the config from the package.
+    *
+    * @return  void
+    */
+    public function register()
+    {
+          $this->mergeConfigFrom(
+            __DIR__.'/../config/twig-magic.php.php',
+            'twig-magic.php/'
+        );
+    }
+
+    private function getFunctions() {
+        return [
+            'renderSVG' => new TwigFunction(
                 'renderSvg',
-                function ($path) {
+                function (string $path, bool $forceInlining = false) {
                     $cachedValue = Cache::get("inline-images-".$path);
-                    if ($cachedValue && config('app.env') != 'development') {
+                    if ($cachedValue) {
                         return $cachedValue;
                     }
                     $publicPath = public_path($path);
                     if (file_exists($publicPath)) {
                         $mimeType = File::mimeType($publicPath);
                         if ($mimeType = 'image/svg') {
-                            $cutOffSize = config('svgloader.inline_cutoff');
+                            $cutOffSize = config('twig-magic.svg_inline_cutoff');
                             if (File::size($publicPath) <= $cutOffSize) {
                                 $payload = File::get($publicPath);
                                 Cache::set("inline-images-".$path, $payload);
@@ -48,26 +77,27 @@ class TwigMagicServiceProvider extends ServiceProvider {
                         'html'
                     ]
                 ]
-            )
-        );
-        Twig::addFunction(
-            new TwigFunction(
+            ),
+            'inlineCss' => new TwigFunction(
                 'inlineCss',
-                function ($path) {
+                function (string $path, bool $forceInlining = false) {
                     $cachedValue = Cache::get("inline-css-".$path);
-                    if ($cachedValue && config('app.env') != 'development') {
+                    if ($cachedValue) {
                         return $cachedValue;
                     }
                     $publicPath = public_path($path);
+
                     if (file_exists($publicPath)) {
-                        $mimeType = File::mimeType($publicPath);
+
                         $extension = File::extension($publicPath);
-                        if ($mimeType == 'text/x-asm' && $extension == 'css') {
+                        
+                        if ($extension == 'css') {
+
                             $payload = '<style>'.File::get($publicPath).'</style>';
                             Cache::set("inline-css-".$path, $payload);
                             return $payload;
                         }
-                        return;
+                        
                     }
                 },
                 [
@@ -75,39 +105,8 @@ class TwigMagicServiceProvider extends ServiceProvider {
                         'html'
                     ]
                 ]
-
-            )
-        );
-        Twig::addFunction(
-            new TwigFunction(
-                'inlineJs',
-                function ($path) {
-                    $cachedValue = Cache::get("inline-js-".$path);
-                    if ($cachedValue && config('app.env') != 'development') {
-                        return $cachedValue;
-                    }
-                    $publicPath = public_path($path);
-                    if (file_exists($publicPath)) {
-                        $mimeType = File::mimeType($publicPath);
-                        $extension = File::extension($publicPath);
-                        if ($mimeType == 'text/x-asm' && $extension == 'css') {
-                            $payload = '<script>'.File::get($publicPath).'</script>';
-                            Cache::set("inline-js-".$path, $payload);
-                            return $payload;
-                        }
-                        return;
-                    }
-                },
-                [
-                    'is_safe' => [
-                        'html'
-                    ]
-                ]
-
-            )
-        );
-        Twig::addFunction(
-            new TwigFunction(
+            ),
+            'preloadAsset' => new TwigFunction(
                 'preloadAsset',
                 function ($path) {
                     if (file_exists(public_path($path))) {
@@ -120,15 +119,13 @@ class TwigMagicServiceProvider extends ServiceProvider {
                         'html'
                     ]
                 ]
-            )
-        );
-        Twig::addFunction(
-            new TwigFunction(
+            ),
+            'preloadDir' => new TwigFunction(
                 'preloadDir',
                 function ($path, $extension = '*') {
                     $cacheKey = 'compiled-directory-preloads-'.str_replace("/", "_", $path).'-'.$extension;
                     $cachedValue = Cache::get($cacheKey);
-                    if ($cachedValue && config('app.env') != 'development') {
+                    if ($cachedValue) {
                         return $cachedValue;
                     }
                     if (file_exists(public_path($path))) {
@@ -156,16 +153,6 @@ class TwigMagicServiceProvider extends ServiceProvider {
                     ]
                 ]
             )
-        );
-
-    }
-
-    /**
-    * Make config publishment optional by merging the config from the package.
-    *
-    * @return  void
-    */
-    public function register()
-    {
+        ];
     }
 }
