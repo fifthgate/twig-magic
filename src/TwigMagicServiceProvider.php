@@ -41,7 +41,6 @@ class TwigMagicServiceProvider extends ServiceProvider {
                             continue;
                         }
                         $mimeType = File::mimeType($fileInfo->getPathName());
-   
                         $returnString.="<link rel='preload' href='{$path}/{$fileInfo->getFileName()}' type='{$mimeType}' crossorigin>";
                         $returnString.="\n";
                     }
@@ -102,6 +101,7 @@ class TwigMagicServiceProvider extends ServiceProvider {
 
                 $cachedValue = Cache::get($cacheKey);
                 $testMode = config('twig-magic.test-mode');
+                $debug = config('twig-magic.debug', false);
                 if ($cachedValue && ! $testMode) {
                     return $cachedValue;
                 }
@@ -112,10 +112,13 @@ class TwigMagicServiceProvider extends ServiceProvider {
                     if ($extension == 'css') {
                         $cutOffSize = config('twig-magic.css_inline_cutoff');
                         if (File::size($absolutePath) <= $cutOffSize or $forceInlining) {
-                            $payload = '<style>'.File::get($absolutePath).'</style>';
-                        } else {
 
-                            $payload = "<link rel='stylesheet' media='{$media}' href='/{$path}'>";
+                            $payload = $debug ? "<!-- {$path} Inlined by TwigMagic -->" : "";
+                            $payload .= '<style>'.File::get($absolutePath).'</style>';
+                            $payload .= $debug ? '<!-- End Inlining -->' : "";
+                        } else {
+                            $payload = $debug ? "<!-- {$path} Too big for TwigMagic to Inline -->" : "";
+                            $payload .= "<link rel='stylesheet' media='{$media}' href='/{$path}'>";
                         }
                         Cache::set($cacheKey, $payload);
                         return $payload;
@@ -203,8 +206,13 @@ class TwigMagicServiceProvider extends ServiceProvider {
         return new TwigFunction(
             'preloadAsset',
             function ($path) {
-                if (file_exists(public_path($path))) {
-                    $mimeType = File::mimeType(public_path($path));
+                $publicPath = public_path($path);
+                if (file_exists($publicPath)) {
+                    $mimeType = File::mimeType($publicPath);
+                    $extension = File::extension($publicPath);
+                    if ($extension == 'css') {
+                      return "<link rel='preload' href='/{$path}' as='style'>"  ;
+                    } 
                     return "<link rel='preload' href='{$path}' type='{$mimeType}' crossorigin>";
                 }
             },
