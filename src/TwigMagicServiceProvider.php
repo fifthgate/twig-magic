@@ -41,7 +41,7 @@ class TwigMagicServiceProvider extends ServiceProvider {
                             continue;
                         }
                         $mimeType = File::mimeType($fileInfo->getPathName());
-                        $returnString.="<link rel='preload' href='{$path}/{$fileInfo->getFileName()}' type='{$mimeType}' crossorigin>";
+                        $returnString.="<link rel='preload' href='/{$path}/{$fileInfo->getFileName()}' type='{$mimeType}' crossorigin>";
                         $returnString.="\n";
                     }
                     Cache::set($cacheKey, $returnString);
@@ -78,7 +78,7 @@ class TwigMagicServiceProvider extends ServiceProvider {
                             Cache::set($cacheKey, $payload);
                             return $payload;        
                         } else {
-                            return "<img src='{$path}'></img>";
+                            return "<img src='/{$path}'></img>";
                         }
                     }
                 }
@@ -115,9 +115,10 @@ class TwigMagicServiceProvider extends ServiceProvider {
 
                             $payload = $debug ? "<!-- {$path} Inlined by TwigMagic -->" : "";
                             $payload .= '<style>'.File::get($absolutePath).'</style>';
-                            $payload .= $debug ? '<!-- End Inlining -->' : "";
+                            $payload .= $debug ? "<!-- End {$path} Inlining -->" : "";
+
                         } else {
-                            $payload = $debug ? "<!-- {$path} Too big for TwigMagic to Inline -->" : "";
+                            $payload = $debug ? "<!-- {$path} Too big for TwigMagic to inline -->" : "";
                             $payload .= "<link rel='stylesheet' media='{$media}' href='/{$path}'>";
                         }
                         Cache::set($cacheKey, $payload);
@@ -160,9 +161,10 @@ class TwigMagicServiceProvider extends ServiceProvider {
                     if ($extension == 'js') {
                         $cutOffSize = config('twig-magic.js_inline_cutoff');
                         if (File::size($publicPath) <= $cutOffSize or $forceInlining) {
+                            $debug = config('twig-magic.debug', false);
                             $fileContent = File::get($publicPath);
-
-                            $payload = "<script";
+                            $payload = $debug ? "<!-- {$path} Inlined by TwigMagic -->" : "";
+                            $payload .= "<script";
                             if ($async) {
                                 $payload.=' async';
                             }
@@ -173,6 +175,7 @@ class TwigMagicServiceProvider extends ServiceProvider {
                             
                             $payload.=$fileContent;
                             $payload.='</script>';
+                            $payload .= $debug ? "<!-- End {$path} Inlining -->" : "";
                             
                         } else {
                             $payload = "<script";
@@ -182,7 +185,7 @@ class TwigMagicServiceProvider extends ServiceProvider {
                             if ($defer) {
                                 $payload.=' defer';
                             }
-                            $payload.=" src='{$publicPath}'";
+                            $payload.=" src='/{$publicPath}'";
                             $payload.='>';
                             
                             
@@ -213,7 +216,7 @@ class TwigMagicServiceProvider extends ServiceProvider {
                     if ($extension == 'css') {
                       return "<link rel='preload' href='/{$path}' as='style'>"  ;
                     } 
-                    return "<link rel='preload' href='{$path}' type='{$mimeType}' crossorigin>";
+                    return "<link rel='preload' href='/{$path}' type='{$mimeType}' crossorigin>";
                 }
             },
             [
