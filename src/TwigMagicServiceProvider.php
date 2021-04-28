@@ -59,7 +59,8 @@ class TwigMagicServiceProvider extends ServiceProvider {
     private function renderSVG() {
         return new TwigFunction(
             'renderSvg',
-            function (string $path, bool $forceInlining = false) {
+            function (string $path, bool $forceInlining = false, array $classes = []) {
+
                 $cacheKey = $this->pathToCacheKey('image', $path);
                 $cachedValue = Cache::get($cacheKey);
                 $testMode = config('twig-magic.test-mode');
@@ -75,10 +76,21 @@ class TwigMagicServiceProvider extends ServiceProvider {
                         $cutOffSize = config('twig-magic.svg_inline_cutoff');
                         if (File::size($publicPath) <= $cutOffSize or $forceInlining) {
                             $payload = File::get($publicPath);
+                            if (!empty($classes)) {
+                                $classString = implode(" ", $classes);
+                                $payload = "<div class='svgwrapper {$classString}'>{$payload}</div>";
+                            }
                             Cache::set($cacheKey, $payload);
+
                             return $payload;        
                         } else {
-                            return "<img src='/{$path}'></img>";
+                            if (empty($classes)) {
+                                return "<img src='/{$path}'></img>";    
+                            } else {
+                                $classString = implode(" ", $classes);
+                                return "<img class='{$classString}' src='/{$path}'></img>";
+                            }
+                            
                         }
                     }
                 }
