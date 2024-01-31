@@ -20,5 +20,9 @@
                 "Fifthgate\\TwigMagic\\TwigMagicServiceProvider"
             ]
         }
+    },
+    "require": {
+        "laravel/framework": "^10.10",
+        "twig/twig": "^3.8"
     }
 }

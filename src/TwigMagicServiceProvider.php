@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Fifthgate\TwigMagic;
 
 use Illuminate\Support\ServiceProvider;
-use DinhQuocHan\Twig\Facades\Twig;
+
 use Twig\TwigFunction;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Cache;
@@ -15,16 +15,16 @@ use \Exception;
 class TwigMagicServiceProvider extends ServiceProvider
 {
 
+    private bool $testMode;
 
     private function pathToCacheKey(string $assetType, string $path) : string
     {
         $sanitizedPath = str_replace("/", "_", $path);
         $sanitizedPath = str_replace(".", "_", $sanitizedPath);
-        $cacheKey = "inline-{$assetType}-{$sanitizedPath}";
-        return $cacheKey;
+        return "inline-{$assetType}-{$sanitizedPath}";
     }
 
-    private function preloadDir()
+    private function preloadDir(): TwigFunction
     {
         return new TwigFunction(
             'preloadDir',
@@ -48,8 +48,14 @@ class TwigMagicServiceProvider extends ServiceProvider
                             continue;
                         }
                         $mimeType = File::mimeType($fileInfo->getPathName());
-                        $returnString.="<link rel='preload' href='/{$path}/{$fileInfo->getFileName()}' type='{$mimeType}' crossorigin>";
-                        $returnString.="\n";
+
+                        $returnString.=sprintf(
+                            "<link rel='preload' href='/%s/%s' type='%s' crossorigin>\n",
+                            $path,
+                            $fileInfo->getFileName(),
+                            $mimeType
+                        );
+
                     }
                     Cache::set($cacheKey, $returnString);
                     return $returnString;
@@ -62,11 +68,12 @@ class TwigMagicServiceProvider extends ServiceProvider
             ]
         );
     }
-    private function renderSVG()
+    private function renderSVG(): TwigFunction
     {
         return new TwigFunction(
             'renderSvg',
-            function (string $path, bool $forceInlining = false, array $classes = []) {
+            function (string $path, bool $forceInlining = false, array $classes = []
+        ): ?string {
 
                 $cacheKey = $this->pathToCacheKey('image', $path);
                 $cachedValue = Cache::get($cacheKey);
@@ -92,15 +99,19 @@ class TwigMagicServiceProvider extends ServiceProvider
                             return $payload;
                         } else {
                             if (empty($classes)) {
-                                return "<img src='/{$path}'></img>";
+                                return sprintf('<img src="%s">', $path);
                             } else {
-                                $classString = implode(" ", $classes);
-                                return "<img class='{$classString}' src='/{$path}'></img>";
+
+                                return sprintf(
+                                    '<img src="%s" class="%s">',
+                                    $path,
+                                    implode(" ", $classes)
+                                );
                             }
                         }
                     }
                 }
-                return;
+                return null;
             },
             [
                 'is_safe' => [
@@ -110,7 +121,7 @@ class TwigMagicServiceProvider extends ServiceProvider
         );
     }
 
-    private function inlineCSS()
+    private function inlineCSS(): TwigFunction
     {
         return new TwigFunction(
             'inlineCss',
@@ -133,11 +144,13 @@ class TwigMagicServiceProvider extends ServiceProvider
 
                         if (File::size($absolutePath) <= $cutOffSize or $forceInlining) {
                             $payload = $debug ? "<!-- {$path} Inlined by TwigMagic -->" : "";
-                            $payload .= '<style>'.File::get($absolutePath).'</style>';
+                            $payload .= sprintf('<style>%s</style>', File::get($absolutePath));
+
                             $payload .= $debug ? "<!-- End {$path} Inlining -->" : "";
                         } else {
                             $payload = $debug ? "<!-- {$path} Too big for TwigMagic to inline -->" : "";
-                            $payload .= "<link rel='stylesheet' media='{$media}' href='/{$path}'>";
+                            $payload .= sprintf("<link rel='stylesheet' media='%s' href='/%s'>", $media, $path);
+
                         }
                         Cache::set($cacheKey, $payload);
                         return $payload;
@@ -145,7 +158,7 @@ class TwigMagicServiceProvider extends ServiceProvider
                 } else {
                     throw new Exception("{$path} not found");
                 }
-                return;
+                return null;
             },
             [
                 'is_safe' => [
@@ -155,7 +168,7 @@ class TwigMagicServiceProvider extends ServiceProvider
         );
     }
 
-    private function inlineCssMultiple()
+    private function inlineCssMultiple(): TwigFunction
     {
         return new TwigFunction(
             'inlineCssMultiple',
@@ -209,7 +222,7 @@ class TwigMagicServiceProvider extends ServiceProvider
         );
     }
 
-    private function inlineJS()
+    private function inlineJS(): TwigFunction
     {
         return new TwigFunction(
             'inlineJs',
@@ -267,7 +280,7 @@ class TwigMagicServiceProvider extends ServiceProvider
                         return $payload;
                     }
                 }
-                return;
+                return null;
             },
             [
                 'is_safe' => [
@@ -277,7 +290,7 @@ class TwigMagicServiceProvider extends ServiceProvider
         );
     }
 
-    private function preloadAsset()
+    private function preloadAsset(): TwigFunction
     {
         return new TwigFunction(
             'preloadAsset',
@@ -307,7 +320,7 @@ class TwigMagicServiceProvider extends ServiceProvider
     public function boot()
     {
 
-        $this->testMode = config('twig-magic.test-mode');
+        $this->testMode = config('twig-magic.test-mode') ?? false;
         $this->publishes(
             [
                 __DIR__.'/../config/twig-magic.php' => config_path('twig-magic.php'),
