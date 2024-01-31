@@ -14,9 +14,6 @@
             "Fifthgate\\TwigMagic\\": "src/"
         }
     },
-    "require": {
-        "dinhquochan/laravel-twig": "^1.3"
-    },
     "extra": {
         "laravel": {
             "providers": [
