@@ -11,7 +11,6 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Cache;
 use \DirectoryIterator;
 use \Exception;
-use TwigBridge\Twig;
 
 class TwigMagicServiceProvider extends ServiceProvider
 {
