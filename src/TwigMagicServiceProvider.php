@@ -328,12 +328,6 @@ class TwigMagicServiceProvider extends ServiceProvider
             ],
             'twig-magic'
         );
-
-        foreach ($this->getFunctions() as $functionName => $function) {
-            Twig::addFunction(
-                $function
-            );
-        }
     }
 
     /**
