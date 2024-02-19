@@ -4,19 +4,14 @@ declare(strict_types=1);
 
 namespace Fifthgate\TwigMagic;
 
-use Illuminate\Support\ServiceProvider;
-
-use Twig\TwigFunction;
-use Illuminate\Support\Facades\File;
+use DirectoryIterator;
 use Illuminate\Support\Facades\Cache;
-use \DirectoryIterator;
-use \Exception;
+use Illuminate\Support\Facades\File;
+use \Twig\Extension\AbstractExtension;
+use Twig\TwigFunction;
 
-class TwigMagicServiceProvider extends ServiceProvider
+class TwigMagicExtension extends AbstractExtension
 {
-
-    private bool $testMode;
-
     private function pathToCacheKey(string $assetType, string $path) : string
     {
         $sanitizedPath = str_replace("/", "_", $path);
@@ -73,7 +68,7 @@ class TwigMagicServiceProvider extends ServiceProvider
         return new TwigFunction(
             'renderSvg',
             function (string $path, bool $forceInlining = false, array $classes = []
-        ): ?string {
+            ): ?string {
 
                 $cacheKey = $this->pathToCacheKey('image', $path);
                 $cachedValue = Cache::get($cacheKey);
@@ -243,7 +238,7 @@ class TwigMagicServiceProvider extends ServiceProvider
 
                 if (file_exists($publicPath)) {
                     $extension = File::extension($publicPath);
-                    
+
                     if ($extension == 'js') {
                         $cutOffSize = config('twig-magic.js_inline_cutoff');
                         if (File::size($publicPath) <= $cutOffSize or $forceInlining) {
@@ -258,7 +253,7 @@ class TwigMagicServiceProvider extends ServiceProvider
                                 $payload.=' defer';
                             }
                             $payload.='>';
-                            
+
                             $payload.=$fileContent;
                             $payload.='</script>';
                             $payload .= $debug ? "<!-- End {$path} Inlining -->" : "";
@@ -272,8 +267,8 @@ class TwigMagicServiceProvider extends ServiceProvider
                             }
                             $payload.=" src='/{$publicPath}'";
                             $payload.='>';
-                            
-                            
+
+
                             $payload.='</script>';
                         }
                         Cache::set($cacheKey, $payload);
@@ -312,37 +307,7 @@ class TwigMagicServiceProvider extends ServiceProvider
             ]
         );
     }
-    /**
-    * Publishes configuration file.
-    *
-    * @return  void
-    */
-    public function boot()
-    {
-
-        $this->testMode = config('twig-magic.test-mode') ?? false;
-        $this->publishes(
-            [
-                __DIR__.'/../config/twig-magic.php' => config_path('twig-magic.php'),
-            ],
-            'twig-magic'
-        );
-    }
-
-    /**
-    * Make config publishment optional by merging the config from the package.
-    *
-    * @return  void
-    */
-    public function register()
-    {
-        $this->mergeConfigFrom(
-            __DIR__.'/../config/twig-magic.php',
-            'twig-magic.php/'
-        );
-    }
-
-    private function getFunctions()
+    public function getFunctions(): array
     {
         return [
             'renderSVG' => $this->renderSVG(),
