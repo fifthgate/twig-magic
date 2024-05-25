@@ -14,16 +14,8 @@
             "Fifthgate\\TwigMagic\\": "src/"
         }
     },
-    "extra": {
-        "laravel": {
-            "providers": [
-                "Fifthgate\\TwigMagic\\TwigMagicServiceProvider"
-            ]
-        }
-    },
     "require": {
         "laravel/framework": "^10.10",
-            "twig/twig": "^3.8",
-        "rcrowe/twigbridge": "^0.14.1"
+        "twig/twig": "^3.8"
     }
 }
